@@ -1,3 +1,6 @@
+**********************************************************************
+Initial Draft of PCalc_T
+
 #include <cstring>
 #include <stdexcept>
 #include <fstream>
@@ -17,16 +20,9 @@
 PCalc_T::PCalc_T(unsigned int array_size, unsigned int num_threads):PCalc(array_size), tSize(array_size), threadNum(num_threads) 
 {   
    // create a vector to hold the primes for thread use
-   primes.reserve(threadNum - 1); 
-   
+   primes.reserve(sqrt(tSize)/2); 
    // clean primes out of garbage
    primes.clear();
-
-   // initialize primes
-   for(int i = 0; i < threadNum - 1; i++)
-   {
-	primes.emplace_back(0);
-   }
 
    // create thread pool
    createPool(threadNum - 1); // use one less because one thread needs to be in charge 
@@ -49,49 +45,23 @@ PCalc_T::~PCalc_T() {
 
 void PCalc_T::markNonPrimes()
 {
-   int set = 0; 
-   int index = 1;
-   
-   // give two for the first thread to get going 
-   primes[0] = 2;
-   
-   std::this_thread::sleep_for(std::chrono::nanoseconds(500));
+   primes.emplace_back(2);
+   std::this_thread::sleep_for(std::chrono::microseconds(2));
 
-   // Do the selection part of the algorithm
    for(int i = 3; i < sqrt(tSize); i++) // each number at array
    {
 	if(this->at(i) == true) // found prime, get rid of everything that is divisible by it
 	{
-                set = 0;
 		// put prime in primes list
-		while(set == 0)
-		{
-			if(primes.at(index) == 0)
-			{
-			    primes[index] = i;
-			    set = 1;
-			    //std::cout << "New set: " << i << std::endl;
-			}
-			index = (index + 1) % (threadNum - 1);
-		}
+		primes.push_back(i);
+		std::this_thread::sleep_for(std::chrono::nanoseconds(500));
 	}
    }
-   // put 1 in primes so threads know they are done once they complete what they have
-   for(int j = 0; j <  threadNum - 1; j++)
-   {
-	set = 0;
-	while(set != 1)
-	{       
-		if(primes.at(j) == 0)
-		{
-			primes[j] = 1;
-			set = 1;
-		}
-	}	
-   } 
+   // put 1 in primes so threads know they are done
+   primes.push_back(1); 
 
-   // Join threads
-   for(int i = 0; i < threadNum-1; i++)
+
+   for(int i = 0; i < threadNum-1; i++)//while(!tPool.empty())
    {
 	tPool.at(i).join();
    }
@@ -122,7 +92,7 @@ void PCalc_T::oneRound(int num)
 
 void PCalc_T::cleanup() {
    // clean up the threadpool
-   std::cout << "Threads Cleaned Up " << std::endl;
+   std::cout << "Deleting threads" << std::endl;
    
 }
 
@@ -141,8 +111,9 @@ void PCalc_T::createPool(int num)
    // fill tPool with threads 
    for(int i = 0; i < num; i++)
    {
-	// use a lambda to pass in this and run the tRun function with parameter index
-	tPool.emplace_back(std::thread([this, i]{tRun(i);}));
+	// use a lambda to pass in this and run the tRun function with parameter 0
+	tPool.emplace_back(std::thread([this]{tRun();}));
+
    }
 }
 
@@ -153,43 +124,64 @@ void PCalc_T::createPool(int num)
  * 
  ************************************************************************************************/
 
-void PCalc_T::tRun(int index)
+void PCalc_T::tRun()
 {
-   //std::cout << "Thread number: " << index << std::endl;
    int num = 0;
    while(num != 1) 
    {
-        if(this->primes.at(index) == 0)
+        if(this->primes.empty())
 	{
 		num = 0; 
 	}
 	else
 	{
-                // new prime for this thread, analyze it and set it to waiting 
-		num = this->primes.at(index);
-                this->primes[index] = 0; 
+		num = this->getPrime();
 	}
    	// received a prime so process it
    	if(num > 1)
    	{
+		// do a second check to make sure hasn't changed to false
+		//if(this->at(num))
+		//{
 			//std::cout << std::this_thread::get_id() << std::endl;
    	 		this->oneRound(num);
 			//std::cout << "Did one round :)" << std::endl;
+		//}
    	}
    	else if(num == 0) // no work case 
    	{
-		//std::this_thread::sleep_for(std::chrono::nanoseconds(500));
+		std::this_thread::sleep_for(std::chrono::nanoseconds(500));
 		//std::cout << "Waited" << std::endl;
    	}
-   	else if(num == 1) // time to exit case 
+   	else if(num == 1) // TODO:time to join thread to kill it
    	{
+		//std::this_thread::join();
    	}
    	else //catch garbage case
    	{
    		std::cout << "Thread reached processed unexpected value" << std::endl;
    	}
    }
-
-
 }
+
+
+/************************************************************************************************
+ * getPrime - function for threads get the next available prime  
+ * 
+ *	returns the next prime for a thread to use 
+ *
+ ************************************************************************************************/
+int PCalc_T::getPrime()
+{
+	std::lock_guard<std::mutex> lock(primesMutex);
+	int first_prime = this->primes.at(0);
+	if(first_prime != 1)
+	{
+		this->primes.erase(primes.begin()); 
+	}
+	return first_prime;
+}
+
+
  
+****************************************************************************
