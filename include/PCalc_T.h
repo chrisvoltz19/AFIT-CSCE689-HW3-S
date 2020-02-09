@@ -16,6 +16,7 @@
 // use num_threads to cap off how many threads you use to calculate all prime numbers
 
 // I referenced stackoverflow.com/questions/15752659/thread-pooling-in-c11 and talked general threading concepts with Josh Larson to better understand, at a more general level, threading 
+// I referenced stackoverflow.com/questions/50175002/invalid-use-of-non-static-member-function-c-thread-linux for an idea of how to use a lambda to pass in the function and this to my thread
 
 class PCalc_T : public PCalc { 
    public:
@@ -27,8 +28,11 @@ class PCalc_T : public PCalc {
       PCalc_T(unsigned int array_size, unsigned int num_threads); 
       void createPool(int num);
       void oneRound(int num); 
-      void tRun(); //TODO: does this have to be static?
+      void tRun();
       int getPrime();
+      
+      // speed up
+      void tRun2(int index);
 
       // if you overload, don't forget to call me
       virtual void cleanup();
@@ -45,6 +49,8 @@ class PCalc_T : public PCalc {
       std::vector<std::thread> tPool; // vector to hold threads that have been created 
       std::vector<unsigned int> primes; // vector to hold the primes for the threads
       std::mutex primesMutex; // mutex to guard the prime vector
+
+
       
       unsigned int tSize;
 
