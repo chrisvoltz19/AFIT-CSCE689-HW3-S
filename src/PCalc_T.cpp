@@ -51,6 +51,10 @@ void PCalc_T::markNonPrimes()
 {
    int set = 0; 
    int index = 1;
+   if(threadNum == 2)
+   {
+	index = 0;
+   }
    
    // give two for the first thread to get going 
    primes[0] = 2;
